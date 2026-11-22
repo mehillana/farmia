@@ -2,7 +2,7 @@
 
 Un poble de muntanya, un hortet i una Dama que vetlla des del cim. Cuida els veïns, escolta les seves necessitats… i decideix quines ofrenes val la pena fer.
 
-👉 **[Juga a Farmia aquí](https://github.io)** *(Recorda substituir aquest enllaç pel teu!)*
+👉 **[Juga a Farmia aquí](https://mehillana.github.io/farmia)**
 
 ---
 
