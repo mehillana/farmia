@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ca"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Farmia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:dark;--pn:rgba(34,26,18,.86);--tx:#f3e9d8;--mu:#c3b190;--ac:#e8b04a;--bd:rgba(255,240,210,.18);--st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;background:#0b0e14;color:var(--tx);font:14px/1.4 "Google Sans","Google Sans Flex","Product Sans",system-ui,sans-serif;overflow:hidden}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.p{position:absolute;background:var(--pn);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid var(--bd);border-radius:10px;padding:7px 12px}
+#top{top:calc(10px + var(--st));left:10px;right:10px;display:flex;flex-wrap:wrap;gap:3px 16px;justify-content:space-between;font-size:13px}
+#top b{color:var(--ac)}
+#tb{bottom:calc(10px + var(--sb));left:50%;transform:translateX(-50%);display:flex;flex-wrap:wrap;gap:5px;align-items:center;justify-content:center;max-width:calc(100% - 20px)}
+.sep{width:1px;height:22px;background:var(--bd)}
+button{font:inherit;color:var(--tx);background:rgba(255,255,255,.08);border:1px solid var(--bd);border-radius:8px;padding:4px 9px;cursor:pointer}
+button:hover{background:rgba(232,176,74,.25)}button.on{background:var(--ac);color:#2a1d0e}
+#log{left:50%;transform:translateX(-50%);bottom:calc(64px + var(--sb));max-width:min(560px,calc(100% - 20px));text-align:center;transition:opacity .6s;opacity:0;pointer-events:none}
+#tip{position:fixed;pointer-events:none;display:none;background:var(--pn);border:1px solid var(--bd);border-radius:6px;padding:3px 8px;font-size:12.5px;transform:translate(12px,12px);white-space:nowrap}
+#md{display:none;top:50%;left:50%;transform:translate(-50%,-50%);width:min(480px,calc(100% - 20px));max-height:72%;overflow:auto;padding:14px}
+#md h3{margin:0 0 6px;color:var(--ac)}#md h4{margin:10px 0 4px;color:var(--mu);font-weight:normal}
+.r{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap}
+.x{position:absolute;top:8px;right:8px}.bar{height:6px;width:70px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden;display:inline-block}.bar i{display:block;height:100%}
+#ov{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,10,16,.5);padding:16px}
+#ov .card{max-width:460px;background:var(--pn);border:1px solid var(--bd);border-radius:14px;padding:22px;text-align:center}
+#ov h1{margin:0 0 6px;font-size:34px;color:var(--ac);letter-spacing:2px}#ov p{margin:6px 0;color:var(--mu);line-height:1.45}
+#ov button{margin:12px 4px 0;padding:8px 20px;font-size:16px;background:var(--ac);color:#2a1d0e;border:0}
+@media(max-width:560px){#log{bottom:calc(104px + var(--sb))}#top{font-size:12px}}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="top" class="p"><span id="t1"></span><span id="t2"></span></div>
+<div id="tb" class="p"></div>
+<div id="log" class="p"></div><div id="tip"></div><div id="md" class="p"></div>
+<div id="ov"><div class="card"><h1>FARMIA</h1><p id="ovt">Un poble de muntanya, un hortet i una Dama que vetlla des del cim. Cuida els veïns, escolta les seves necessitats… i decideix què ofrenes val la pena fer.</p>
+<p>🖱️ Arrossega per girar, roda per fer zoom.<br>🌱 Tria llavor a la barra i toca un bancal: sembra, rega i cull. 🌲 Talla llenya · 🏠 encén el foc · 🏪 mercat · 👥 dona feina als veïns.<br>🕯️ Toca els veïns i els animals per interactuar-hi. A l’altar hi ha benediccions, i tot té un preu. 💧 Els cultius només creixen si estan humits (plou o regues). ❄️ A l’hivern no es pot sembrar.</p>
+<button data-a="start">Nova partida</button><button data-a="cont" id="ct" style="display:none">Continuar</button></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const $=i=>document.getElementById(i),sm=(a,b,x)=>{x=Math.min(1,Math.max(0,(x-a)/(b-a)));return x*x*(3-2*x)};
+let seed=11;const rnd=()=>(seed=seed*16807%2147483647)/2147483647;
+const SEAS=["🌱 Primavera","☀️ Estiu","🍂 Tardor","❄️ Hivern"],HN=["Cal Pastor","Cal Fuster"],NM=[["Joan","Roser"],["Miquel","Teresa"]];
+function H(x,z){const r=Math.hypot(x,z);let h=52*Math.exp(-(x*x*.5+(z+50)**2)/800)+26*Math.exp(-((x-46)**2+(z+8)**2)/520)+24*Math.exp(-((x+50)**2+(z+4)**2)/480)+sm(20,70,Math.abs(x))*10+sm(-8,-45,z)*14;
+ h+=(Math.sin(x*.23+1)*Math.cos(z*.19)*1.6+Math.sin(x*.61+z*.47)*.6)*sm(12,28,r);h*=sm(12,25,r);return h-sm(13,20,z)*90}
+// Escena
+const cv=$("c"),ren=new THREE.WebGLRenderer({canvas:cv,antialias:true});ren.setPixelRatio(Math.min(devicePixelRatio,2));ren.shadowMap.enabled=true;ren.shadowMap.type=THREE.PCFSoftShadowMap;
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.1,600);cam.position.set(20,14,24);
+const ctl=new THREE.OrbitControls(cam,cv);ctl.target.set(0,2,1);ctl.enablePan=false;ctl.enableDamping=true;ctl.minDistance=10;ctl.maxDistance=70;ctl.maxPolarAngle=1.45;ctl.autoRotate=true;ctl.autoRotateSpeed=.6;
+sc.background=new THREE.Color(0x9ccbe8);sc.fog=new THREE.Fog(0x9ccbe8,70,230);
+const hemi=new THREE.HemisphereLight(0xcfe3ff,0x4a3c2c,.5),sun=new THREE.DirectionalLight(0xffffff,1.2);sc.add(hemi,sun,sun.target);
+sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-30,right:30,top:30,bottom:-30,far:140});sun.shadow.bias=-.0008;
+const M=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:.95,flatShading:true},o));
+function box(w,h,d,c,x,y,z,par,sh=true){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=sh;par.add(m);return m}
+// Terreny
+const tg=new THREE.PlaneGeometry(240,240,120,120);tg.rotateX(-Math.PI/2);{const p=tg.attributes.position;for(let i=0;i<p.count;i++)p.setY(i,H(p.getX(i),p.getZ(i)));tg.computeVertexNormals();tg.setAttribute("color",new THREE.BufferAttribute(new Float32Array(p.count*3),3))}
+const terr=new THREE.Mesh(tg,new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,roughness:1}));terr.receiveShadow=true;sc.add(terr);
+function paint(s){const p=tg.attributes.position,n=tg.attributes.normal,c=tg.attributes.color,gr=[[.43,.6,.29],[.5,.66,.29],[.68,.52,.24],[.95,.96,.99]][s],sl=[9,20,7,-8][s],sn=[.6,.05,.5,1.2][s];
+ for(let i=0;i<p.count;i++){const x=p.getX(i),y=p.getY(i),z=p.getZ(i),ny=n.getY(i),k=.93+((i*37)%11)/80,ns=(Math.sin(x*.9+z*.4)+Math.sin(z*.8-x*.3)+2)/4;let q;
+  if(y<-22)q=[.27,.32,.34];else if(y>sl&&ny>.3)q=[.96,.97,1];else if(y<9&&Math.hypot(x,z)<40&&ny>.6)q=ns<sn?[.95,.96,.99]:gr;else q=ny>.5&&y>sl-6?[.9,.92,.96]:[.47,.44,.4];
+  c.setXYZ(i,q[0]*k,q[1]*k,q[2]*k)}c.needsUpdate=true;trees.forEach(t=>t.g.children.forEach(ch=>{if(ch.geometry.type==="ConeGeometry")ch.material.color.setHex(s===3?0xe3ecf0:s===0?0x5a8a5a:0x2f5d37)}))}
+// Cases
+const inter=[],wins=[],lights=[],chim=[];
+function house(w,d,h,wall,roof,x,z,ry,i){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;
+ box(w,h,d,wall,0,h/2,0,g);box(w+.25,.35,d+.25,0x5e574f,0,.17,0,g);
+ const r=new THREE.Mesh(new THREE.ConeGeometry(1,h*.8,4),M(roof));r.rotation.y=Math.PI/4;r.scale.set((w/2+.5)/.707,1,(d/2+.5)/.707);r.position.y=h+h*.4;r.castShadow=true;g.add(r);
+ box(.95,1.7,.12,0x4a2f1b,0,.85,d/2+.03,g);const wn=box(.8,.7,.12,0x2b3440,w/2-1,h*.62,d/2+.03,g);wins[i]=wn;
+ box(.8,.7,.12,0x2b3440,-w/2+1,h*.62,d/2+.03,g).material.color.setHex(0x3a4452);
+ box(.55,1.4,.55,0x6b625a,w/2-.9,h+.85,-d/4,g);[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([a,b])=>box(.26,h,.26,0x4a3523,a*w/2,h/2,b*d/2,g));
+ box(w+.2,.18,.18,0x4a3523,0,h-.15,d/2+.04,g);
+ const l=new THREE.PointLight(0xffa040,0,13);l.position.set(0,2,d/2+1.2);g.add(l);lights[i]=l;
+ g.userData={kind:"house",i};sc.add(g);g.updateMatrixWorld(true);chim[i]=new THREE.Vector3(w/2-.9,h+1.6,-d/4).applyMatrix4(g.matrixWorld);inter.push(g);return g}
+house(4.6,3.6,2.8,0x8a7f70,0x4d3a28,-7,-3,.3,0);house(4,3.4,2.6,0x9a8d78,0x5a4330,6.5,-5,-.4,1);
+// Grangeta
+const barn=new THREE.Group();barn.position.set(8,0,4.5);barn.rotation.y=-.5;
+box(5,2.4,4,0x7a5a3a,0,1.2,0,barn);for(let i=-2;i<=2;i++)box(.12,2.4,4.06,0x5d4329,i*1,1.2,0,barn);
+box(1.4,1.8,.12,0x4a2f1b,0,.9,2.03,barn);box(5.2,.2,.2,0x4a3523,0,2.4,2.05,barn);
+{const bg=new THREE.CylinderGeometry(2.45,2.45,5.4,3);bg.rotateX(-Math.PI/2);bg.rotateY(Math.PI/2);const rg=new THREE.Mesh(bg,M(0x9a7d48));rg.scale.y=.6;rg.position.y=2.4+.6;rg.castShadow=true;barn.add(rg)}
+barn.userData={kind:"barn"};sc.add(barn);inter.push(barn);
+for(let i=0;i<3;i++){const b=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,.5,10),M(0xc9aa4e));b.position.set(3+i*.9,.25,1+(i%2)*.8);b.castShadow=true;barn.add(b)}
+// Hortet
+const plots=[],fence=new THREE.Group();sc.add(fence);
+[[-7.6,4],[-4.4,4],[-7.6,7],[-4.4,7],[-.6,4.6],[-.6,7.6]].forEach(([x,z],i)=>{const g=new THREE.Group();g.position.set(x,0,z);box(2.5,.3,2.5,0x4b3321,0,.15,0,g);const cr=new THREE.Group();
+ for(let a=-1;a<=1;a++)for(let b=-1;b<=1;b++){const l=new THREE.Mesh(new THREE.ConeGeometry(.2,.6,6),M(0x4c9a3c));l.position.set(a*.7,.6,b*.7);l.castShadow=true;const r=new THREE.Mesh(new THREE.SphereGeometry(.14,7,6),M(0xe8872c));r.position.set(a*.7,.38,b*.7);r.name="r";cr.add(l,r)}
+ g.add(cr);g.userData={kind:"plot",i};sc.add(g);inter.push(g);plots[i]={g,cr}});
+{const x0=-9.2,x1=-2.8,z0=2.6,z1=8.4;for(let x=x0;x<=x1+.1;x+=1.6){box(.18,1,.18,0x6a4a2c,x,.5,z0,fence);box(.18,1,.18,0x6a4a2c,x,.5,z1,fence)}for(let z=z0;z<=z1+.1;z+=1.6){box(.18,1,.18,0x6a4a2c,x0,.5,z,fence);box(.18,1,.18,0x6a4a2c,x1,.5,z,fence)}
+ [.35,.75].forEach(y=>{box(x1-x0,.08,.08,0x7a5a3a,(x0+x1)/2,y,z0,fence);box(x1-x0,.08,.08,0x7a5a3a,(x0+x1)/2,y,z1,fence);box(.08,.08,z1-z0,0x7a5a3a,x0,y,(z0+z1)/2,fence);box(.08,.08,z1-z0,0x7a5a3a,x1,y,(z0+z1)/2,fence)})}
+// Pou
+{const w=new THREE.Mesh(new THREE.CylinderGeometry(.8,.9,.9,10),M(0x77706a));w.position.set(0,.45,2.5);w.castShadow=true;sc.add(w);box(.12,1.6,.12,0x5d4329,-.7,1.4,2.5,sc);box(.12,1.6,.12,0x5d4329,.7,1.4,2.5,sc);box(1.8,.12,.12,0x5d4329,0,2.2,2.5,sc)}
+// Arbres
+const trees=[];function pine(){const g=new THREE.Group();box(.4,1.2,.4,0x5a3f26,0,.6,0,g);[[1.3,1.6,1.1],[1.0,1.5,2.2],[.7,1.3,3.2]].forEach(([r,h,y])=>{const c=new THREE.Mesh(new THREE.ConeGeometry(r,h,7),M(0x2f5d37));c.position.y=y;c.castShadow=true;g.add(c)});return g}
+for(let n=0,t=0;n<400&&t<22;n++){const x=(rnd()-.5)*76,z=-30+rnd()*40,r=Math.hypot(x,z),y=H(x,z);if(r<14||y<-.5||y>22||z>10)continue;if([[-7,-3],[6.5,-5],[8,4.5]].some(b=>Math.hypot(x-b[0],z-b[1])<5))continue;
+ const g=pine();g.position.set(x,y,z);g.scale.setScalar(.9+rnd()*.7);g.userData={kind:"tree",i:t};sc.add(g);inter.push(g);trees.push({g,cd:0});t++}
+// Animals, mercat, galliner, veïns
+const goats=[],hens=[],people=[],DR=[[-6.4,-.6],[5.8,-2.7]],SC=[0xa23b2e,0x2e5aa2,0x3d7a3a,0xb08a2e,0x7a3d7a,0x2e8a8a,0x8a5a2e,0x5a5a5a];
+const GN=["Blanca","Moreneta","Cornuda","Pebrot","Lluna"],HNm=["Pita","Roseta","Plomes","Clo"];
+for(let i=0;i<5;i++){const g=new THREE.Group(),c=[0xe9e4d8,0xb9a58a,0x4a3f36,0xd8c8a8,0x8a7a68][i];
+ box(.8,.5,.36,c,0,.55,0,g);box(.3,.3,.28,c,.5,.82,0,g);box(.16,.16,.22,0xcdbfae,.7,.74,0,g);
+ [-1,1].forEach(z=>{const hn=new THREE.Mesh(new THREE.ConeGeometry(.04,.26,6),M(0xd8d0c0));hn.position.set(.46,1.12,z*.1);hn.rotation.z=.4;g.add(hn);box(.05,.14,.1,c,.46,.94,z*.2,g)});
+ box(.04,.16,.04,0xd8d0c0,.74,.62,0,g);box(.08,.12,.05,c,-.42,.72,0,g);[[-.3,.14],[-.3,-.14],[.3,.14],[.3,-.14]].forEach(([a,b])=>box(.08,.35,.08,0x3a322a,a,.18,b,g));
+ g.position.set(4.5+i*.8,0,8);g.userData={kind:"animal",t:"g",i};sc.add(g);inter.push(g);goats.push({g,tx:5,tz:8.5,w:0})}
+for(let i=0;i<4;i++){const g=new THREE.Group(),c=[0xf4efe6,0xd8a060,0x6a4a3a,0xe8d8b8][i];box(.38,.3,.26,c,0,.32,0,g);box(.16,.2,.15,c,.22,.52,0,g);box(.07,.06,.05,0xe8a020,.32,.5,0,g);box(.06,.1,.05,0xc92a1e,.22,.65,0,g);box(.05,.08,.04,0xc92a1e,.3,.42,0,g);box(.1,.22,.2,c,-.24,.45,0,g).rotation.z=.5;[-1,1].forEach(z=>box(.03,.16,.03,0xe8a020,0,.08,z*.05,g));
+ g.position.set(-3+i*.5,0,-8);g.visible=false;g.userData={kind:"animal",t:"h",i};sc.add(g);inter.push(g);hens.push({g,tx:-3,tz:-8,w:0})}
+const coop=new THREE.Group();coop.position.set(-3.5,0,-9.5);box(2.6,1.4,1.8,0x8a6a44,0,.7,0,coop);{const r=new THREE.Mesh(new THREE.ConeGeometry(1,.9,4),M(0x5a4330));r.rotation.y=Math.PI/4;r.scale.set(2.1,1,1.5);r.position.y=1.85;r.castShadow=true;coop.add(r)}box(.5,.6,.1,0x3a2a1c,.5,.5,.93,coop);coop.userData={kind:"coop"};coop.visible=false;sc.add(coop);inter.push(coop);
+const market=new THREE.Group();market.position.set(0,0,-7);[[-1.3,-.8],[1.3,-.8],[-1.3,.8],[1.3,.8]].forEach(([a,b])=>box(.15,2,.15,0x5d4329,a,1,b,market));box(2.9,.1,1.9,0xc0392b,0,2.05,0,market);for(let i=0;i<5;i++)box(.5,.12,1.9,0xf0e6d2,-1.2+i*.6,2.06,0,market);box(2.4,.8,1,0x7a5a3a,0,.4,-.3,market);box(.5,.3,.5,0xe8872c,-.6,.95,-.3,market);box(.5,.3,.5,0xe0c050,.2,.95,-.3,market);box(.4,.4,.4,0x8a6a2c,.8,.95,-.3,market);market.userData={kind:"market"};sc.add(market);inter.push(market);
+const SK=[0xf0c8a0,0xe0b088,0xc98f66,0x8d5a3a],HRc=[0x2a1a10,0x5a3a1c,0x8a6a2c,0xb8b0a0,0x1a1a1a],TR=["Devot","Sensible","Pràctic","Golafre","Valent"],EM={};
+function emo(e){const c=document.createElement("canvas");c.width=c.height=64;const x=c.getContext("2d");x.font="44px sans-serif";x.textAlign="center";x.textBaseline="middle";x.fillText(e,32,36);return new THREE.CanvasTexture(c)}
+["🍽️","🥶","😞","💬","💀"].forEach(e=>EM[e]=emo(e));
+const pm=(par,geo,col,x,y,z)=>{const m=new THREE.Mesh(geo,M(col));m.position.set(x,y,z);m.castShadow=true;par.add(m);return m},pv=(par,x,y,z)=>{const q=new THREE.Group();q.position.set(x,y,z);par.add(q);return q};
+function addPerson(name,h,job,fem,trait,lk){lk=lk||(Math.random()*1e6|0);const g=new THREE.Group(),sk=SK[lk%4],hr=HRc[lk%5],fm=fem==null?lk%2===0:fem,tc=SC[(lk>>3)%8];
+ pm(g,new THREE.CylinderGeometry(.19,.27,.62,10),tc,0,.8,0);pm(g,new THREE.CylinderGeometry(.275,.275,.06,10),0x3a2a1c,0,.58,0);if(fm)pm(g,new THREE.BoxGeometry(.3,.42,.03),0xece4d0,0,.76,.2);
+ const legs=[-1,1].map(s=>{const p=pv(g,s*.09,.5,0);pm(p,new THREE.BoxGeometry(.12,.5,.14),0x4a3b2a,0,-.25,0);pm(p,new THREE.BoxGeometry(.14,.1,.22),0x2a1c12,0,-.47,.03);return p}),
+ arms=[-1,1].map(s=>{const p=pv(g,s*.27,1.07,0);pm(p,new THREE.BoxGeometry(.09,.42,.1),tc,0,-.21,0);pm(p,new THREE.SphereGeometry(.055,8,6),sk,0,-.45,0);return p});
+ pm(g,new THREE.SphereGeometry(.18,12,10),sk,0,1.3,0);pm(g,new THREE.SphereGeometry(.04,6,6),sk,0,1.28,.17);[-1,1].forEach(s=>pm(g,new THREE.SphereGeometry(.025,6,6),0x111111,s*.065,1.33,.155));
+ pm(g,new THREE.SphereGeometry(.19,10,8,0,6.283,0,1.75),hr,0,1.31,-.01);if(fm)pm(g,new THREE.SphereGeometry(.09,8,8),hr,0,1.36,-.17);else if(lk%3===0)pm(g,new THREE.SphereGeometry(.12,8,6),hr,0,1.19,.09).scale.set(1,.7,.7);
+ const hats=[null,pv(g,0,0,0),pv(g,0,0,0),pv(g,0,0,0)];
+ pm(hats[1],new THREE.CylinderGeometry(.36,.36,.03,14),0xd8b860,0,1.46,0);pm(hats[1],new THREE.CylinderGeometry(.16,.2,.12,10),0xd8b860,0,1.52,0);
+ pm(hats[2],new THREE.ConeGeometry(.15,.32,8),0xb3261e,.04,1.58,0).rotation.z=.35;pm(hats[2],new THREE.CylinderGeometry(.19,.19,.06,10),0x7a1a14,0,1.45,0);
+ pm(hats[3],new THREE.CylinderGeometry(.23,.23,.05,12),0x2e3a2e,.02,1.47,0);pm(hats[3],new THREE.SphereGeometry(.03,6,6),0x2e3a2e,.02,1.51,0);
+ const tools=[null,pv(arms[1],0,-.45,.08),pv(arms[1],0,-.45,.08),pv(arms[1],0,-.45,.08)];
+ pm(tools[1],new THREE.BoxGeometry(.03,.9,.03),0x6a4a2c,0,.2,.15).rotation.x=.5;pm(tools[1],new THREE.BoxGeometry(.14,.04,.09),0x8a8a8a,0,-.2,.38);
+ pm(tools[2],new THREE.BoxGeometry(.03,.75,.03),0x6a4a2c,0,.2,.12).rotation.x=.3;pm(tools[2],new THREE.BoxGeometry(.04,.14,.18),0x9a9aa0,0,.5,.22);
+ pm(tools[3],new THREE.BoxGeometry(.03,1.1,.03),0x6a4a2c,0,.25,.05);pm(tools[3],new THREE.TorusGeometry(.1,.025,6,10,4.2),0x6a4a2c,0,.82,.05);
+ const em=new THREE.Sprite(new THREE.SpriteMaterial({map:EM["💬"],transparent:true,depthTest:false}));em.scale.set(.55,.55,1);em.position.y=1.95;em.renderOrder=10;em.visible=false;g.add(em);
+ const ring=new THREE.Mesh(new THREE.RingGeometry(.42,.52,24),new THREE.MeshBasicMaterial({color:0x5cff9d,side:THREE.DoubleSide}));ring.rotation.x=-Math.PI/2;ring.position.y=.04;ring.visible=false;g.add(ring);
+ g.scale.setScalar(.95);g.position.set(DR[h][0],0,DR[h][1]);g.userData={kind:"person",i:people.length};sc.add(g);inter.push(g);
+ const v={name,h,hp:100,job,alive:true,g,w:0,task:-1,tree:-1,ate:0,hu:false,wx:0,wz:0,fem:fm,lk,trait:trait||TR[(lk>>5)%5],mood:70,faith:20,sat:80,wish:null,talked:0,prayed:0,low:0,legs,arms,hats,tools,em,ring,mv:false};setLook(v);people.push(v);return v}
+function setLook(v){v.hats.forEach((p,k)=>p&&(p.visible=k===v.job));v.tools.forEach((p,k)=>p&&(p.visible=k===v.job))}
+function clearPeople(){people.forEach(v=>{sc.remove(v.g);const k=inter.indexOf(v.g);if(k>=0)inter.splice(k,1)});people.length=0}
+// Altar, espantall, corbs, sang
+const AX=-8.5,AZ=-8.2,candles=[],scarEyes=[],ravens=[],parts=[];
+const altar=new THREE.Group();altar.position.set(AX,0,AZ);altar.rotation.y=.5;
+box(2.2,.35,1.5,0x5a5650,0,.18,0,altar);box(1.7,.5,1.1,0x6e6a64,0,.6,0,altar);box(1.9,.1,1.3,0x8a857c,0,.9,0,altar);box(.7,.02,.5,0x6a0f12,.1,.96,.1,altar);
+[[-.7,-.4],[.7,-.4],[-.7,.4],[.7,.4]].forEach(([a,b])=>{box(.07,.3,.07,0xe8dcc0,a,1.1,b,altar);const f=new THREE.Mesh(new THREE.SphereGeometry(.05,6,6),new THREE.MeshBasicMaterial({color:0xff7a30}));f.position.set(a,1.3,b);altar.add(f);candles.push(f)});
+box(.12,2.2,.12,0x4a3523,0,1.1,-.9,altar);{const sk=new THREE.Mesh(new THREE.SphereGeometry(.22,10,8),M(0xe8e2d0));sk.position.set(0,2.35,-.9);altar.add(sk);box(.2,.1,.18,0xe8e2d0,0,2.15,-.8,altar);
+ [-1,1].forEach(q=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.05,6,6),new THREE.MeshBasicMaterial({color:0x111111}));e.position.set(q*.08,2.38,-.7);altar.add(e);const an=new THREE.Mesh(new THREE.ConeGeometry(.04,.5,5),M(0xcfc6b0));an.position.set(q*.3,2.7,-.9);an.rotation.z=-q*.6;altar.add(an)})}
+const altarL=new THREE.PointLight(0xff3a20,0,9);altarL.position.set(0,1.6,.3);altar.add(altarL);altar.userData={kind:"altar"};sc.add(altar);inter.push(altar);
+{const q=new THREE.Group();q.position.set(-6,0,5.5);box(.1,2,.1,0x5d4329,0,1,0,q);box(1.5,.1,.1,0x5d4329,0,1.55,0,q);box(.6,.7,.2,0x6a4a2c,0,1.3,0,q);
+ [-1,1].forEach(z=>{box(.2,.12,.12,0xd8c060,z*.8,1.55,0,q);const e=new THREE.Mesh(new THREE.SphereGeometry(.035,6,6),new THREE.MeshBasicMaterial({color:0xff2a1a}));e.position.set(z*.09,2.1,.24);q.add(e);scarEyes.push(e)});
+ const hd=new THREE.Mesh(new THREE.SphereGeometry(.26,10,8),M(0xcdb98a));hd.position.y=2.05;hd.castShadow=true;q.add(hd);box(.3,.03,.02,0x222222,0,1.97,.25,q);const ht=new THREE.Mesh(new THREE.ConeGeometry(.3,.35,8),M(0x4a3523));ht.position.y=2.45;q.add(ht);box(.7,.04,.7,0x4a3523,0,2.27,0,q);sc.add(q)}
+for(let i=0;i<3;i++){const g=new THREE.Group(),w=[-1,1].map(q=>box(.4,.03,.18,0x111118,q*.28,0,0,g));box(.3,.14,.12,0x111118,0,0,0,g);box(.12,.1,.1,0x111118,.18,.06,0,g);box(.08,.04,.04,0x555555,.27,.06,0,g);g.visible=false;sc.add(g);ravens.push({g,w})}
+const bm=new THREE.MeshBasicMaterial({color:0x9a1218}),bgm=new THREE.SphereGeometry(.07,6,6);
+function blood(x,z){for(let i=0;i<18;i++){const m=new THREE.Mesh(bgm,bm);m.position.set(x,1.1,z);m.userData={vx:(Math.random()-.5)*4,vy:2+Math.random()*3,vz:(Math.random()-.5)*4,t:0};sc.add(m);parts.push(m)}}
+// Fum, núvols, neu, estrelles
+const smoke=[0,1].map(()=>Array.from({length:6},()=>{const m=new THREE.Mesh(new THREE.SphereGeometry(.28,8,8),new THREE.MeshBasicMaterial({color:0xd5d5d5,transparent:true,opacity:0,depthWrite:false}));sc.add(m);return m}));
+const clouds=Array.from({length:16},()=>{const g=new THREE.Group();for(let i=0;i<4;i++){const s=new THREE.Mesh(new THREE.SphereGeometry(5+rnd()*5,8,6),new THREE.MeshLambertMaterial({color:0xffffff,transparent:true,opacity:.93}));s.position.set(i*6-9,rnd()*2,rnd()*4);s.scale.y=.45;g.add(s)}g.position.set((rnd()-.5)*220,-30-rnd()*22,18+rnd()*90);g.userData.v=1+rnd()*2;sc.add(g);return g});
+const sg=new THREE.BufferGeometry(),sp=[];for(let i=0;i<900;i++){const u=rnd()*2-1,t=rnd()*6.283,s=Math.sqrt(1-u*u);sp.push(300*s*Math.cos(t),Math.abs(300*u)*.9+10,300*s*Math.sin(t))}sg.setAttribute("position",new THREE.Float32BufferAttribute(sp,3));
+const stars=new THREE.Points(sg,new THREE.PointsMaterial({size:1.4,color:0xffffff,transparent:true,opacity:0,fog:false,sizeAttenuation:false}));sc.add(stars);
+const snG=new THREE.BufferGeometry(),snA=new Float32Array(900);for(let i=0;i<900;i+=3){snA[i]=(rnd()-.5)*70;snA[i+1]=rnd()*40;snA[i+2]=(rnd()-.5)*70}snG.setAttribute("position",new THREE.BufferAttribute(snA,3));
+const snow=new THREE.Points(snG,new THREE.PointsMaterial({size:.22,color:0xffffff,transparent:true,opacity:.9}));snow.visible=false;snow.frustumCulled=false;sc.add(snow);
+// ===== Farmia =====
+const MN=["Març","Abril","Maig","Juny","Juliol","Agost","Setembre","Octubre","Novembre","Desembre","Gener","Febrer"],WX=["☀️ Sol","⛅ Núvols","🌧️ Pluja","🌨️ Neu"],BT=[6,16,3,-9],WT=[3,0,-2,-3];
+const CR=[{n:"Patata",e:"🥔",k:"patata",d:4,y:4,ok:[0,2],c:0xb08a54},{n:"Pastanaga",e:"🥕",k:"pastanaga",d:3,y:3,ok:[0,1,2],c:0xe8872c},{n:"Blat",e:"🌾",k:"blat",d:6,y:6,ok:[0,1],c:0xe0c050},{n:"Carbassa",e:"🎃",k:"carbassa",d:8,y:2,ok:[1,2],c:0xd9731a}];
+const IT={patata:["🥔",2],pastanaga:["🥕",2],blat:["🌾",3],carbassa:["🎃",8],ous:["🥚",3],llet:["🥛",4],llenya:["🪵",1],carn:["🥩",5],guisat:["🍲",7],formatge:["🧀",12]},FOOD=["guisat","formatge","carn","ous","llet","carbassa","patata","pastanaga"],JOBS=["Lliure","Pagès","Llenyataire","Pastor"];
+const BASE=["patata","pastanaga","blat","carbassa","ous","llet","llenya"],RNIGHT=new THREE.Color(0x2a0508),WISH={formatge:"formatge 🧀",guisat:"un guisat 🍲",ous:"ous 🥚",carn:"carn 🥩",llet:"llet 🥛"},BC=[15,25,20,20];
+const LINES={Devot:["La Dama mira des del cim. Hem de ser agraïts.","Quan encenc les espelmes, sento algú respirar darrere meu.","Que la fam no ens trobi sense ofrenes."],Sensible:["Els corbs no deixen de mirar-me…","Odio la sang a l’altar. Però ningú m’escolta.","Aquesta nit he sentit plorar la neu."],Pràctic:["Amb prou llenya i un bon graner no calen déus.","Si fem números, l’hivern no serà amable.","Un bon formatge val més que mil pregàries."],Golafre:["Un guisat calent i seré el veí més feliç.","Tinc una gana que em faria menjar-me el corb!","Si hi ha carn a taula, no pregunto d’on ve."],Valent:["Que vinguin els llops. Aquí no ens fa por res.","Aquesta muntanya és dura, però nosaltres més.","Demà tallo tants pins que el bosc em dedicarà una cançó."]};
+const PP=[[-7.6,4],[-4.4,4],[-7.6,7],[-4.4,7],[-.6,4.6],[-.6,7.6]],WP=[[0,4],[-6,10.4],[3,-1],[-9,-7],[6,8.5],[-1,-4]];
+const BUILD=[{n:"Nou bancal",c:25,w:0,can:()=>S.owned<6,do:()=>S.owned++},{n:"Galliner",c:30,w:10,can:()=>!S.coop,do:()=>S.coop=true},{n:"Gallina",c:10,w:0,can:()=>S.coop&&S.hl.includes(0),do:()=>{const i=S.hl.indexOf(0);S.hl[i]=1;S.hm[i]=70}},{n:"Cabra",c:18,w:0,can:()=>S.gl.includes(0),do:()=>{const i=S.gl.indexOf(0);S.gl[i]=1;S.gm[i]=70}}];
+const GO=[["Primera collita 🌱",()=>S.harv>0],["Tenir 100 monedes 🪙",()=>S.coins>=100],["Construir el galliner 🐔",()=>S.coop],["Primer sacrifici 🔪",()=>S.sac>0],["Fervor 50 🕯️",()=>S.faith>=50],["Collir 100 verdures 🥕",()=>S.harv>=100],["8 habitants 👥",()=>people.filter(v=>v.alive).length>=8],["Sobreviure el primer hivern ❄️",()=>S.day>60]];
+let S,sp_=0,started=false,mt=null,clk=0,fr=0,lastWx=-1,lt;
+const season=()=>Math.floor(((S.day-1)/5%12)/3),sowOk=c=>CR[c].ok.includes(season()),pickWx=s=>{const r=Math.random(),c=[[.35,.6,.9],[.6,.8,1],[.25,.55,.85],[.15,.35,.35]][s];return r<c[0]?0:r<c[1]?1:r<c[2]?2:3},tempAt=h=>BT[season()]+WT[S.wx]+5*Math.sin((h-9)/24*6.2832);
+const rnG=new THREE.BufferGeometry(),rnA=new Float32Array(1500);for(let i=0;i<1500;i+=3){rnA[i]=(rnd()-.5)*60;rnA[i+1]=rnd()*35;rnA[i+2]=(rnd()-.5)*60}rnG.setAttribute("position",new THREE.BufferAttribute(rnA,3));
+const rain=new THREE.Points(rnG,new THREE.PointsMaterial({size:.12,color:0x9ab8e0,transparent:true,opacity:.7}));rain.visible=false;rain.frustumCulled=false;sc.add(rain);
+let dlg="",evr="";
+function say(t){if(S&&S.dl)S.dl=[t,...S.dl].slice(0,30);const l=$("log");l.textContent=t;l.style.opacity=1;clearTimeout(lt);lt=setTimeout(()=>l.style.opacity=0,4500)}
+function init(){S={day:1,t:.25,coins:20,inv:{patata:6,pastanaga:4,blat:2,carbassa:0,ous:0,llet:0,llenya:8,carn:0,guisat:0,formatge:0},wx:0,owned:4,coop:false,gl:[1,1,0,0,0],hl:[0,0,0,0],gm:[70,70,70,70,70],hm:[70,70,70,70],fire:[0,0],auto:true,af:true,seed:1,harv:0,ach:{},over:false,faith:0,blessed:0,sac:0,rm:0,dbl:0,pev:-1,sel:0,hi:0,dl:[],plots:Array.from({length:6},()=>({st:0,g:0,w:0,c:1,r:0,by:-1}))};
+ clearPeople();[["Joan",0,1,false,"Pràctic"],["Roser",0,0,true,"Devot"],["Miquel",1,2,false,"Valent"],["Teresa",1,3,true,"Sensible"]].forEach(a=>addPerson(...a));trees.forEach(t=>{t.cd=0;t.g.visible=true});S.wx=pickWx(0);paint(0);refresh()}
+const save=()=>{try{localStorage.setItem("farmia2",JSON.stringify({S,pe:people.map(v=>({name:v.name,h:v.h,hp:v.hp,job:v.job,alive:v.alive,fem:v.fem,lk:v.lk,trait:v.trait,mood:v.mood,faith:v.faith,sat:v.sat,wish:v.wish})),tr:trees.map(t=>t.cd)}))}catch(e){}};
+function load(){try{const d=JSON.parse(localStorage.getItem("farmia2"));if(!d)return false;init();Object.assign(S,d.S);S.plots.forEach(p=>p.by=-1);clearPeople();d.pe.forEach(a=>{const v=addPerson(a.name,a.h,a.job,a.fem,a.trait,a.lk);Object.assign(v,{hp:a.hp,alive:a.alive,mood:a.mood,faith:a.faith,sat:a.sat,wish:a.wish});v.g.visible=a.alive});d.tr.forEach((c,i)=>{trees[i].cd=c;trees[i].g.visible=c===0});paint(season());refresh();return true}catch(e){return false}}
+function hud(){const h=S.t*24,mo=Math.floor((S.day-1)/5)%12;$("t1").innerHTML=`<b>${(S.day-1)%5+1} ${MN[mo]}</b> · Any ${Math.floor((S.day-1)/60)+1} · ${String(Math.floor(h)).padStart(2,"0")}:${String(Math.floor(h%1*60)).padStart(2,"0")} · ${SEAS[season()]} · ${WX[S.wx]} ${Math.round(tempAt(h))}°C`;
+ $("t2").innerHTML=`🪙<b>${S.coins}</b> `+Object.keys(IT).filter(k=>BASE.includes(k)||S.inv[k]>0).map(k=>IT[k][0]+S.inv[k]).join(" ")+` · 🕯️${Math.round(S.faith)} · 👥${people.filter(v=>v.alive).length} · 🔥${S.fire.map(f=>f>0?"✔":"✖").join("")}`}
+function tbar(){$("tb").innerHTML=[0,1,3,8].map(x=>`<button data-a="spd" data-b="${x}" class="${sp_===x?"on":""}">${x?x+"×":"⏸"}</button>`).join("")+`<span class="sep"></span>`+CR.map((c,i)=>`<button data-a="seed" data-b="${i}" title="${c.n} · ${c.d} dies" class="${S.seed===i?"on":""}">${c.e}${sowOk(i)?"":"✖"}</button>`).join("")+`<span class="sep"></span><button data-a="mk">🏪</button><button data-a="vn">👥</button><button data-a="ob">🎯</button><button data-a="dl">📜</button><button data-a="op">⚙️</button>`}
+function refresh(){S.plots.forEach((p,i)=>{const o=plots[i],cr=CR[p.c];o.g.visible=i<S.owned;o.cr.visible=p.st>0;o.cr.scale.y=p.st===2?1:.3+.7*Math.min(1,p.g/cr.d);o.cr.children.forEach(m=>{if(m.name==="r"){m.visible=p.st===2;m.material.color.setHex(cr.c)}else m.material.color.setHex(p.st===2?[0x6a9a3c,0x4c9a3c,0xd8c050,0x3f8a34][p.c]:0x4c9a3c)});o.g.children[0].material.color.setHex(p.w>0?0x2e2118:0x4b3321)});
+ goats.forEach((a,i)=>a.g.visible=S.gl[i]===1);hens.forEach((a,i)=>a.g.visible=S.coop&&S.hl[i]===1);coop.visible=S.coop;hud();tbar();modal()}
+const barH=(x,w)=>`<span class="bar" style="width:${w}px"><i style="width:${Math.round(x)}%;background:${x>60?"#7bc26a":x>30?"#e0b040":"#d05040"}"></i></span>`;
+function modal(){const m=$("md");if(!mt){m.style.display="none";return}m.style.display="block";let h=mt==="ev"?"":`<button class="x" data-a="close">✕</button>`;const px=S.dbl===S.day?2:1;
+ if(mt==="mk"){h+=`<h3>🏪 Mercat · 🪙 ${S.coins}${px>1?" · ×2 avui!":""}</h3><h4>Vendre</h4>`;Object.keys(IT).forEach(k=>{if(S.inv[k]>0)h+=`<div class="r"><span>${IT[k][0]} ${k} ×${S.inv[k]} · ${IT[k][1]*px}🪙</span><span><button data-a="sell" data-b="${k}">1</button> <button data-a="sella" data-b="${k}">Tot</button></span></div>`});
+  h+=`<h4>Comprar</h4>`+[["patata",4],["pastanaga",4],["llenya",3]].map(([k,c])=>`<div class="r"><span>${IT[k][0]} ${k} · ${c}🪙</span><button data-a="buy" data-b="${k}:${c}">+1</button></div>`).join("")+`<h4>Construir i ampliar</h4>`+BUILD.map((b,i)=>b.can()?`<div class="r"><span>${b.n} · ${b.c}🪙${b.w?" + "+b.w+"🪵":""}</span><button data-a="build" data-b="${i}">Comprar</button></div>`:"").join("")}
+ else if(mt==="vn"){h+=`<h3>👥 Veïns</h3>`+people.map((v,i)=>v.alive?`<div class="r"><span>${v.fem?"👩":"👨"} <b>${v.name}</b> · ${v.trait} ${barH(v.mood,60)}</span><button data-a="pn" data-b="${i}">Veure</button></div>`:"").join("")}
+ else if(mt==="pn"){const v=people[S.sel];if(!v||!v.alive){mt=null;return modal()}
+  h+=`<h3>${v.fem?"👩":"👨"} ${v.name} <small style="color:var(--mu);font-weight:400">· ${v.trait} · ${HN[v.h]}</small></h3>`+[["❤️ Salut",v.hp],["🍽️ Sacietat",v.sat],["🔥 Abric",abric(v)],["🙂 Ànim",v.mood],["🙏 Fe",v.faith]].map(([l,x])=>`<div class="r"><span>${l}</span>${barH(x,140)}</div>`).join("");
+  const nd=needs(v);h+=`<h4>Necessitats</h4><div>${nd.length?nd.join("<br>"):"✅ Està bé."}</div>`+(dlg?`<p style="color:var(--ac);font-style:italic">“${dlg}”</p>`:"")+`<h4>Interactuar</h4><div class="r"><span><button data-a="talk">💬 Parlar</button> <button data-a="pray">🙏 Pregar junts</button></span></div>`;
+  const gi=FOOD.filter(k=>S.inv[k]>0);if(gi.length)h+=`<div class="r"><span>Regalar: ${gi.map(k=>`<button data-a="gift" data-b="${k}">${IT[k][0]}</button>`).join(" ")}</span></div>`;
+  h+=`<div class="r"><span>Feina: ${JOBS.map((j,jj)=>`<button data-a="job" data-b="${S.sel},${jj}" class="${v.job===jj?"on":""}">${j}</button>`).join(" ")}</span></div>`}
+ else if(mt==="gr"){h+=`<h3>🐐 Granja</h3>`;[["g",S.gl,S.gm,GN,"🐐"],["h",S.hl,S.hm,HNm,"🐔"]].forEach(([t,L,Mo,N,em])=>L.forEach((on,i)=>{if(on)h+=`<div class="r"><span>${em} <b>${N[i]}</b> ${barH(Mo[i],50)}</span><span><button data-a="an" data-b="${t},${i},p" title="Acariciar">🤚</button><button data-a="an" data-b="${t},${i},f" title="Alimentar">🌾</button><button data-a="an" data-b="${t},${i},s" title="Sacrificar a l’altar">🔪🕯️</button><button data-a="an" data-b="${t},${i},b" title="Escorxar">🥩</button></span></div>`}));
+  h+=`<div class="r"><span>🧀 Fer formatge: 3 🥛 → 1 🧀</span><button data-a="cheese">Fer</button></div><p style="color:var(--mu);font-size:12.5px">🤚 acariciar · 🌾 alimentar · 🔪🕯️ sacrifici (fervor) · 🥩 escorxar. Els animals contents (ànim 80+) donen el doble.</p>`}
+ else if(mt==="al"){h+=`<h3>🕯️ Altar de la Dama</h3><div class="r"><span>Fervor</span>${barH(S.faith,160)}</div><p style="color:var(--mu)">La Dama vetlla pel poble des del cim… i cobra els seus favors.</p><h4>Benediccions</h4>`+["🌧️ Pluja beneïda · rega tots els bancals","🌾 Collita beneïda · +50% durant 5 dies","🔥 Foc etern · 6 dies de foc","💞 Guariment · +30 salut a tothom"].map((l,i)=>`<div class="r"><span>${l} · ${BC[i]}🕯️</span><button data-a="blss" data-b="${i}">Invocar</button></div>`).join("")+`<h4>Ofrenes</h4>`+["patata","pastanaga","carbassa"].map(k=>`<div class="r"><span>Oferir ${k==="carbassa"?1:3} ${IT[k][0]} (+${k==="carbassa"?5:6} fervor)</span><button data-a="offer" data-b="${k}">Oferir</button></div>`).join("")+`<div class="r"><span>Sacrificar un animal (molt més fervor)</span><button data-a="gr">Triar</button></div>`}
+ else if(mt==="hs"){const i=S.hi;h+=`<h3>🏠 ${HN[i]}</h3><div class="r"><span>🔥 Foc: ${S.fire[i]} dies</span><button data-a="fire">+3 dies (−1 🪵)</button></div><div class="r"><span>🍲 Cuinar guisat (2 verdures + 1 🪵)</span><button data-a="cook">Cuinar</button></div><h4>Residents</h4>`+people.map((v,j)=>v.alive&&v.h===i?`<div class="r"><span>${v.fem?"👩":"👨"} ${v.name} ${barH(v.mood,70)}</span><button data-a="pn" data-b="${j}">Veure</button></div>`:"").join("")}
+ else if(mt==="ev"){const e=EV[S.pev];h+=`<h3>${e.t}</h3><p>${e.x}</p>`+(evr?`<p style="color:var(--ac)">${evr}</p><button data-a="evok">D’acord</button>`:e.ch.map((c,i)=>`<div class="r"><button data-a="ev" data-b="${i}">${c[0]}</button></div>`).join(""))}
+ else if(mt==="dl")h+=`<h3>📜 Diari</h3>`+(S.dl.length?S.dl.map(x=>`<div class="r"><span>${x}</span></div>`).join(""):"Encara no ha passat res.");
+ else if(mt==="ob")h+=`<h3>🎯 Objectius</h3>`+GO.map(([n,f])=>`<div class="r"><span>${f()?"✅":"⬜"} ${n}</span></div>`).join("");
+ else{const t=(b,l,v)=>`<div class="r"><span>${l}</span><button data-a="tg" data-b="${b}" class="${v?"on":""}">${v?"Sí":"No"}</button></div>`;h+=`<h3>⚙️ Opcions</h3>`+t("auto","Pagesos sembren sols",S.auto)+t("af","Foc automàtic (gasta llenya)",S.af)+t("sh","Ombres",sun.castShadow)+t("rot","Càmera giratòria",ctl.autoRotate)+`<div class="r"><span>Partida</span><span><button data-a="save">Desar</button> <button data-a="new">Nova</button></span></div>`}
+ m.innerHTML=h}
+function sow(k,c){const p=S.plots[k];p.st=1;p.g=0;p.c=c;p.r=0;p.w=S.wx===2?2:0}
+function harvest(k,m){const p=S.plots[k],c=CR[p.c],y=Math.floor(c.y*(S.day<=S.blessed?1.5:1));S.inv[c.k]+=y;S.harv+=y;p.st=0;p.g=0;if(m)say(`Has collit ${y} ${c.e}.`)}
+function eat(v){const f=FOOD.find(k=>S.inv[k]>0);if(f){S.inv[f]--;v.hu=false;v.sat=100;if(f==="guisat")mo(v,8);if(v.trait==="Golafre"&&["carn","guisat","formatge"].includes(f))mo(v,6);if(f===v.wish){mo(v,15);v.wish=null}}else{v.hu=true;say("No hi ha menjar per dinar!")}}
+function findPlot(i){const fr_=k=>{const b=S.plots[k].by;return b<0||b===i||!people[b]||!people[b].alive||people[b].job!==1};
+ for(const f of [p=>p.st===2,p=>p.st===1&&p.w===0,p=>p.st===0&&S.auto&&sowOk(S.seed)])for(let k=0;k<S.owned;k++)if(fr_(k)&&f(S.plots[k]))return k;return -1}
+function jobStep(v,i,q){
+ if(v.job===1){let k=v.task;const okp=k=>{if(k<0||k>=S.owned)return false;const p=S.plots[k];return p.st===2||(p.st===1&&p.w===0)||(p.st===0&&S.auto&&sowOk(S.seed))};
+  if(!okp(k)){if(k>=0)S.plots[k].by=-1;k=findPlot(i);v.task=k;if(k>=0)S.plots[k].by=i}if(k<0)return[-6,10.4];
+  const x=PP[k][0],z=PP[k][1]+1.9;if(Math.hypot(q.x-x,q.z-z)<.8){const p=S.plots[k];if(p.st===2)harvest(k,0);else if(p.st===1)p.w=2;else sow(k,S.seed);p.by=-1;v.task=-1;v.w=.6;refresh()}return[x,z]}
+ if(v.job===2){let t=v.tree;if(t<0||!trees[t].g.visible||trees[t].by!==i){t=-1;let bd=1e9;trees.forEach((r,j)=>{if(r.g.visible&&(r.by==null||r.by<0||!people[r.by]||people[r.by].job!==2)){const d=Math.hypot(r.g.position.x-q.x,r.g.position.z-q.z);if(d<bd){bd=d;t=j}}});v.tree=t;if(t>=0)trees[t].by=i}
+  if(t<0)return[-9,-7];const r=trees[t].g.position;if(Math.hypot(q.x-r.x,q.z-r.z)<2){trees[t].g.visible=false;trees[t].cd=8;trees[t].by=-1;S.inv.llenya+=3;v.tree=-1;v.w=1.2;refresh()}return[r.x,r.z]}
+ if(v.job===3){const c=S.coop&&i%2;return[c?-3.5:4.5+Math.sin(clk*.3+i)*2.5,c?-7.5:8.2]}return null}
+const abric=v=>S.fire[v.h]>0?90:Math.max(0,Math.min(100,50+tempAt(S.t*24)*3.5)),mo=(v,d)=>{v.mood=Math.max(0,Math.min(100,v.mood+d))},nG=()=>S.gl.reduce((a,b)=>a+b,0),nH=()=>S.hl.reduce((a,b)=>a+b,0);
+function sit(v){return v.sat<35?"Tinc gana…":abric(v)<35?"Tinc tant fred que no noto els dits.":v.mood<30?"No sé si aguanto més aquí dalt.":v.wish?"Si pogués tenir "+WISH[v.wish]+"…":null}
+function needs(v){const a=[];if(v.sat<35)a.push("🍽️ Té gana");if(abric(v)<35)a.push("🥶 Té fred: encén el foc a "+HN[v.h]);if(v.mood<35)a.push("😞 Està trist");if(v.hp<50)a.push("🤒 Està dèbil");if(v.trait==="Devot"&&S.faith<15)a.push("🙏 Troba a faltar els rituals");if(v.wish)a.push("💬 Desitja: "+WISH[v.wish]);return a}
+function sac(t,i,altar){const g=t==="g",L=g?S.gl:S.hl,nm=(g?GN:HNm)[i],m=S.rm===S.day?2:1;L[i]=0;S.sac++;
+ if(altar){S.faith=Math.min(100,S.faith+(g?15:8)*m);S.inv.carn++;blood(AX,AZ);people.forEach(v=>{if(v.alive)mo(v,v.trait==="Devot"?8:v.trait==="Sensible"?-12:-2)});say(nm+" ha estat oferta a la Dama. L’altar beu en silenci.")}
+ else{S.inv.carn+=g?4:2;blood(5,6.5);people.forEach(v=>{if(v.alive&&v.trait==="Sensible")mo(v,-4)});say(nm+" ha acabat a la taula.")}}
+function anAct(t,i,k){const g=t==="g",Mo=g?S.gm:S.hm,nm=(g?GN:HNm)[i];
+ if(k==="p"){Mo[i]=Math.min(100,Mo[i]+10);say(nm+(g?" bela de gust.":" cloqueja contenta."))}
+ else if(k==="f"){if(S.inv.blat>0)S.inv.blat--;else if(S.inv.patata>0)S.inv.patata--;else return say("No tens pinso.");Mo[i]=Math.min(100,Mo[i]+15);say(nm+" menja amb ganes.")}
+ else sac(t,i,k==="s")}
+const EV=[
+{t:"🌑 Lluna Roja",x:"La lluna s’ha tornat vermella. L’altar bull de fervor i els corbs no callen.",ok:()=>true,ch:[["Ritual amb una cabra (fervor doble)",()=>{const i=S.gl.indexOf(1);if(i<0)return"No tens cap cabra.";sac("g",i,true);return"La Dama ha somrigut. Els corbs ballen sobre l’altar."}],["Tancar portes i finestres",()=>{people.forEach(v=>mo(v,3));return"La nit passa entre murmuris."}]]},
+{t:"🐦‍⬛ El Corb Parlant",x:"Un corb enorme t’observa des de la tanca: «Dos ous i et dic on dorm el tresor».",ok:()=>true,ch:[["Donar 2 ous",()=>{if(S.inv.ous<2)return"No tens ous. El corb se’n va rient.";S.inv.ous-=2;S.coins+=30;S.faith=Math.min(100,S.faith+8);return"El corb et mostra una pedra solta: 30🪙!"}],["Ignorar-lo",()=>"El corb xiscla i desapareix."]]},
+{t:"🧥 Un foraster",x:"Un foraster ferit pica a la porta. Té la mirada estranya i les mans plenes de fang.",ok:()=>people.filter(v=>v.alive).length<8,ch:[["Acollir-lo (−2 menjar)",()=>{const f=FOOD.filter(k=>S.inv[k]>0);if(f.length<1)return"No tens menjar per oferir-li. Se’n va.";for(let n=0;n<2;n++){const k=FOOD.find(k=>S.inv[k]>0);if(k)S.inv[k]--}const hs=[0,1].filter(h=>people.filter(v=>v.alive&&v.h===h).length<4),v=addPerson("Foraster",hs[0]??0,0);v.name=["Oriol","Mercè","Nil","Dolors"][Math.random()*4|0];return v.name+" s’instal·la al poble. Parla poc i mira molt."}],["Fer-lo fora",()=>{people.forEach(v=>{if(v.trait==="Devot")mo(v,-6)});return"Se’n va entre la neu sense mirar enrere."}]]},
+{t:"🐺 Ulls a la nit",x:"Han vist uns ulls grocs entre els pins. Els llops rondaran el corral.",ok:()=>season()>=2&&S.gl.includes(1),ch:[["Foc a la tanca (−2 llenya)",()=>{if(S.inv.llenya<2)return"No tens llenya. Els llops s’emporten una cabra.";S.inv.llenya-=2;return"Les flames els mantenen lluny."}],["Llençar-los una cabra",()=>{const i=S.gl.indexOf(1);S.gl[i]=0;people.forEach(v=>mo(v,v.trait==="Sensible"?-8:-2));return"Els udols s’allunyen. El corral és més silenciós."}]]},
+{t:"🌫️ Boira estranya",x:"Una boira espessa puja del cingle. Es senten veus dins el cap.",ok:()=>true,ch:[["Foc gran a la plaça (−3 llenya)",()=>{if(S.inv.llenya<3)return"No hi ha llenya. Les veus es fan més fortes.";S.inv.llenya-=3;people.forEach(v=>mo(v,8));return"La llum espanta les veus."}],["Resar",()=>{S.faith=Math.min(100,S.faith+10);people.forEach(v=>mo(v,-4));return"Algú respon… i no és cap veí."}]]},
+{t:"🛒 Traginers",x:"Una caravana de traginers s’atura al poble.",ok:()=>true,ch:[["Vendre al doble avui",()=>{S.dbl=S.day;return"Aprofita el mercat!"}],["Comprar vi (−10🪙, ànims +10)",()=>{if(S.coins<10)return"No tens monedes.";S.coins-=10;people.forEach(v=>mo(v,10));return"Aquella nit se sent cantar."}],["Deixar-los marxar",()=>"Marxen cap al coll."]]},
+{t:"🐣 Ha nascut un cabrit",x:"Una de les cabres ha parit a la nit.",ok:()=>S.gl.filter(x=>x).length>=2&&S.gl.includes(0),ch:[["Quin goig!",()=>{const i=S.gl.indexOf(0);S.gl[i]=1;S.gm[i]=90;return GN[i]+" ja bruela pel corral."}]]},
+{t:"🪶 Pluja de corbs",x:"Una bandada de corbs s’ha llançat sobre l’hortet i esquinça els brots.",ok:()=>S.plots.some((p,i)=>i<S.owned&&p.st>0),ch:[["Espantar-los (−1 llenya)",()=>{if(S.inv.llenya<1)return"No tens llenya. Perds una sembra.";S.inv.llenya--;return"Amb fum i crits, marxen."}],["Oferir-los 3 patates",()=>{if(S.inv.patata<3)return"No tens patates.";S.inv.patata-=3;S.faith=Math.min(100,S.faith+5);return"Els corbs mengen en silenci i s’inclinen."}]]}];
+function pUpdate(g,h){const night=h>=21.5||h<6,lunch=h>=12&&h<13.2,work=h>=6.5&&h<19&&!lunch;
+ people.forEach((v,i)=>{if(!v.alive)return;const q=v.g.position;v.mv=false;if(g)v.sat=Math.max(0,v.sat-g/80*55);if(h>=12.5&&!night&&v.ate<S.day){v.ate=S.day;eat(v)}let tx,tz;
+  if(night||lunch){tx=DR[v.h][0];tz=DR[v.h][1];if(night&&Math.hypot(q.x-tx,q.z-tz)<.8)v.g.visible=false}
+  else{if(!v.g.visible){v.g.visible=true;q.set(DR[v.h][0],0,DR[v.h][1])}if(v.w>0){v.w-=g;anim(v,0,work&&(v.job===1||v.job===2));return}
+   const t=work?jobStep(v,i,q):null;if(t){tx=t[0];tz=t[1]}else{if(!v.wx||Math.hypot(q.x-v.wx,q.z-v.wz)<.4){const w=WP[Math.random()*WP.length|0];v.wx=w[0]+(Math.random()-.5)*1.6;v.wz=w[1]+(Math.random()-.5)*1.6;v.w=1+Math.random()*3}tx=v.wx;tz=v.wz}}
+  if(!v.g.visible)return;const dx=tx-q.x,dz=tz-q.z,d=Math.hypot(dx,dz);if(d>.25&&g){const st=Math.min(d,1.7*g);q.x+=dx/d*st;q.z+=dz/d*st;v.g.rotation.y=Math.atan2(dx,dz);q.y=H(q.x,q.z)+Math.abs(Math.sin(clk*9))*.05;v.mv=true}anim(v,v.mv,false)})}
+function anim(v,mv,wk){const sw=mv?Math.sin(clk*10)*.7:0;v.legs[0].rotation.x=sw;v.legs[1].rotation.x=-sw;v.arms[0].rotation.x=-sw*.8;v.arms[1].rotation.x=wk?-.9+Math.sin(clk*12)*.8:sw*.8}
+function extras(dt,dk){const sp=people[S.sel],f=mt==="pn"&&sp&&sp.g.visible;tv.copy(f?sp.g.position:CT);if(f)tv.y=1;ctl.target.lerp(tv,.06);
+ altarL.intensity=(.5+S.faith/50)*(dk<.5?1.6:.6)*(.85+.15*Math.sin(clk*7));candles.forEach((c,i)=>c.scale.setScalar(.8+.3*Math.sin(clk*9+i*2)));scarEyes.forEach(e=>e.visible=dk<.5);
+ ravens.forEach((r,i)=>{const on=dk<.55||S.faith>25;r.g.visible=on;if(!on)return;const a=clk*.5+i*2.1;r.g.position.set(AX+Math.cos(a)*3.2,3.6+Math.sin(clk*1.3+i)*.4,AZ+Math.sin(a)*3.2);r.g.rotation.y=-a;r.w.forEach((w,k)=>w.rotation.z=(k?-1:1)*Math.sin(clk*12+i)*.7)});
+ for(let i=parts.length-1;i>=0;i--){const m=parts[i],u=m.userData;u.t+=dt;if(u.t<1.2){u.vy-=9.8*dt;m.position.x+=u.vx*dt;m.position.y=Math.max(.06,m.position.y+u.vy*dt);m.position.z+=u.vz*dt}if(u.t>3){sc.remove(m);parts.splice(i,1)}}
+ if(S.pev>=0&&started&&!S.over&&S.t*24>=6.5&&!mt){mt="ev";evr="";refresh()}
+ if(fr%12===0)people.forEach(v=>{if(!v.alive)return;const e=v.g.visible?(v.sat<35?"🍽️":abric(v)<35?"🥶":v.hp<40?"💀":v.mood<30?"😞":v.wish?"💬":null):null;if(e){v.em.material.map=EM[e];v.em.material.needsUpdate=true}v.em.visible=!!e;v.ring.visible=mt==="pn"&&people[S.sel]===v})}
+function endDay(){const lg=[],s0=season();
+ if(S.af)for(let i=0;i<2;i++)if(S.fire[i]<1&&s0!==1&&S.inv.llenya>0){S.inv.llenya--;S.fire[i]+=3}
+ let rt=0;S.plots.forEach((p,i)=>{if(i>=S.owned)return;if(p.st===1){if(p.w>0)p.g++;if(p.g>=CR[p.c].d){p.st=2;p.r=0}}else if(p.st===2&&++p.r>5){p.st=0;rt++}p.w=Math.max(0,p.w-1)});if(rt)lg.push(rt+" collites s’han podrit.");
+ const eg=nH(),n=nG()+eg;if(n){let ok=true;for(let nd=Math.ceil(n/3);nd>0;nd--){if(S.inv.blat>0)S.inv.blat--;else if(S.inv.patata>0)S.inv.patata--;else{ok=false;break}}
+  if(ok){const pa=people.some(v=>v.alive&&v.job===3);let lt=pa?1:0,ou=pa&&eg?1:0;S.gl.forEach((x,i)=>{if(x)lt+=1+(S.gm[i]>=80?1:0)});S.hl.forEach((x,i)=>{if(x)ou+=1+(S.hm[i]>=80?1:0)});S.inv.llet+=lt;S.inv.ous+=ou;lg.push("Producció: +"+lt+" llet"+(ou?", +"+ou+" ous":"")+".")}else lg.push("Els animals no tenen pinso (blat o patata)!");
+  S.gm=S.gm.map(x=>Math.max(0,x-8+(ok?5:0)));S.hm=S.hm.map(x=>Math.max(0,x-8+(ok?5:0)))}
+ const al=people.filter(v=>v.alive),tmin=BT[s0]+WT[S.wx]-5,warm=S.fire.map(f=>f>0);S.fire=S.fire.map(f=>Math.max(0,f-1));let cold=false;
+ al.forEach(v=>{let cd=warm[v.h]||tmin>-1?0:Math.round(-tmin*1.4);if(v.trait==="Valent")cd=Math.round(cd*.7);if(cd)cold=true;v.hp=Math.min(100,v.hp+(v.hu?-22:8)-cd);
+  mo(v,(v.hu?-14:3)+(cd?-10:2)+(v.trait==="Devot"?(S.faith>40?3:S.faith<10?-4:0):0)-(v.wish?2:0));v.faith=Math.max(0,v.faith-1);
+  if(v.hp<=0){v.alive=false;v.g.visible=false;lg.push(v.name+" ha mort."+(cd?" De fred.":v.hu?" De gana.":""))}
+  else if(v.mood<12){if(++v.low>=2){v.alive=false;v.g.visible=false;lg.push(v.name+" ha desaparegut de nit… només s’han trobat petjades a la neu.")}}else v.low=0;
+  v.hu=false;v.talked=0;v.prayed=0;if(!v.wish&&Math.random()<.4)v.wish=Object.keys(WISH)[Math.random()*5|0]});
+ if(cold)lg.push("Fa fred a cases sense foc!");
+ S.day++;const s1=season(),mo2=Math.floor((S.day-1)/5)%12;
+ if(s1===3&&s0!==3){let fz=0;S.plots.forEach(p=>{if(p.st===1){p.st=0;fz++}});if(fz)lg.push("L’hivern ha gelat "+fz+" cultius.")}
+ trees.forEach(t=>{if(t.cd>0&&--t.cd===0)t.g.visible=true});
+ S.wx=pickWx(s1);if(S.wx===2)S.plots.forEach(p=>{if(p.st>0)p.w=2});if(S.wx>=2)lg.push("Avui: "+WX[S.wx]+".");
+ if((S.day-1)%5===0)lg.push("Comença "+MN[mo2]+(s1!==s0?" · "+SEAS[s1].slice(3):"")+".");else if(s1===2&&mo2===8&&(S.day-1)%5===3)lg.push("L’hivern s’acosta: guarda menjar i llenya!");
+ if(s1!==s0)paint(s1);
+ const a2=people.filter(v=>v.alive),fs=FOOD.reduce((a,k)=>a+S.inv[k],0);
+ if(a2.length&&a2.length<8&&S.day>8&&fs>=a2.length*5&&a2.every(v=>v.hp>50)&&Math.random()<.3){const hs=[0,1].filter(h=>a2.filter(v=>v.h===h).length<4);if(hs.length){const nm=["Pere","Marta","Jordi","Núria","Ramon","Carme","Biel","Laia","Anna","Pau"],v=addPerson(nm[Math.random()*10|0],hs[Math.random()*hs.length|0],0);lg.push(v.name+" s’instal·la al poble!")}}
+ if(S.pev<0&&S.day>3){if(S.day%25===12){S.pev=0;S.rm=S.day}else if(Math.random()<.3){const el=EV.map((e,i)=>i).filter(i=>i>0&&EV[i].ok());if(el.length)S.pev=el[Math.random()*el.length|0]}}
+ GO.forEach(([nm,f])=>{if(!S.ach[nm]&&f()){S.ach[nm]=1;lg.push("🏆 "+nm)}});
+ if(!a2.length){S.over=true;ctl.autoRotate=true;$("ovt").textContent="El poble s’ha quedat buit… Has aguantat "+(S.day-1)+" dies.";$("ct").style.display="none";$("ov").style.display="flex"}
+ else save();if(lg.length)say(lg.join(" "));refresh()}
+// Interacció
+function act(o){const k=o.userData.kind,i=o.userData.i,s=season();
+ if(k==="plot"){const p=S.plots[i];if(p.st===0){if(s===3)say("Massa fred per sembrar.");else if(!sowOk(S.seed))say(CR[S.seed].n+" no es pot sembrar ara.");else{sow(i,S.seed);say("Has sembrat "+CR[S.seed].e+". Ha d’estar humit per créixer.")}}else if(p.st===1){p.w=2;say("Has regat el bancal.")}else harvest(i,1)}
+ else if(k==="house"){S.hi=i;mt="hs"}
+ else if(k==="tree"){trees[i].g.visible=false;trees[i].cd=8;S.inv.llenya+=3;say("Has tallat un pi: +3 llenya.")}
+ else if(k==="market")mt="mk";else if(k==="person"){S.sel=i;dlg="";mt="pn"}else if(k==="altar")mt="al";else mt="gr";refresh()}
+function tip(o){const u=o.userData,k=u.kind,i=u.i;if(k==="plot"){const p=S.plots[i];return p.st===0?"Bancal buit · sembrar "+CR[S.seed].n:p.st===1?`${CR[p.c].n} · ${p.g}/${CR[p.c].d} dies · ${p.w>0?"humit":"sec: regar"}`:CR[p.c].n+" llest · collir"}
+ if(k==="house")return HN[i]+" · obrir";if(k==="tree")return"Pi · tallar (+3 llenya)";if(k==="market")return"Mercat";if(k==="altar")return"Altar de la Dama";if(k==="person"){const v=people[i];return v.name+" · "+v.trait+" · "+JOBS[v.job]+" "+needs(v).map(x=>x.slice(0,2)).join("")}
+ if(k==="animal")return(u.t==="g"?GN:HNm)[i]+" · interactuar";return k==="coop"?"Galliner":"Granja"}
+const ray=new THREE.Raycaster(),mp=new THREE.Vector2();let dn=null;
+function pick(e){const r=cv.getBoundingClientRect();mp.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(mp,cam);const h=ray.intersectObjects(inter.filter(o=>o.visible),true)[0];if(!h)return null;let o=h.object;while(o&&!o.userData.kind)o=o.parent;return o}
+cv.addEventListener("pointerdown",e=>dn=[e.clientX,e.clientY]);
+cv.addEventListener("pointerup",e=>{if(!dn||!started||S.over||Math.hypot(e.clientX-dn[0],e.clientY-dn[1])>5)return;const o=pick(e);if(o)act(o)});
+cv.addEventListener("pointermove",e=>{if(!started)return;const o=pick(e),t=$("tip");if(o){t.textContent=tip(o);t.style.display="block";t.style.left=e.clientX+"px";t.style.top=e.clientY+"px";cv.style.cursor="pointer"}else{t.style.display="none";cv.style.cursor="grab"}});
+document.addEventListener("click",e=>{const a=e.target.dataset&&e.target.dataset.a;if(!a)return;const b=e.target.dataset.b,v=people[S.sel],px=S.dbl===S.day?2:1;
+ if(a==="start"){init();$("ov").style.display="none";started=true;ctl.autoRotate=false;sp_=1}
+ else if(a==="cont"){if(load()){$("ov").style.display="none";started=true;ctl.autoRotate=false;sp_=1}}
+ else if(a==="spd")sp_=+b;else if(a==="seed")S.seed=+b;else if(a==="close")mt=null;else if(["mk","vn","ob","op","dl","gr","al"].includes(a))mt=a;
+ else if(a==="pn"){S.sel=+b;dlg="";mt="pn"}
+ else if(a==="sell"){S.inv[b]--;S.coins+=IT[b][1]*px}else if(a==="sella"){S.coins+=S.inv[b]*IT[b][1]*px;S.inv[b]=0}
+ else if(a==="buy"){const[k,c]=b.split(":");if(S.coins>=+c){S.coins-=+c;S.inv[k]++}else say("No tens prou monedes.")}
+ else if(a==="build"){const x=BUILD[+b];if(S.coins>=x.c&&S.inv.llenya>=x.w){S.coins-=x.c;S.inv.llenya-=x.w;x.do();say(x.n+" comprat!")}else say("Falten monedes o llenya.")}
+ else if(a==="job"){const[i,j]=b.split(","),p=people[+i];p.job=+j;p.task=-1;p.tree=-1;setLook(p)}
+ else if(a==="talk"){dlg=sit(v)&&Math.random()<.6?sit(v):LINES[v.trait][Math.random()*3|0];if(!v.talked){v.talked=1;mo(v,4)}}
+ else if(a==="gift"){S.inv[b]--;const w=b===v.wish;mo(v,w?25:8);if(w)v.wish=null;v.sat=Math.min(100,v.sat+20);dlg=w?"Just el que volia! Gràcies de cor.":"Gràcies, això m’alegra el dia."}
+ else if(a==="pray"){if(v.prayed)dlg="Ja hem resat avui.";else{v.prayed=1;v.faith=Math.min(100,v.faith+8);S.faith=Math.min(100,S.faith+2);mo(v,v.trait==="Devot"?8:v.trait==="Sensible"?-2:1);dlg="Les espelmes tremolen. Algú ens escolta?"}}
+ else if(a==="an"){const[t,i,k]=b.split(",");anAct(t,+i,k)}
+ else if(a==="cheese"){if(S.inv.llet<3)say("Calen 3 llets.");else{S.inv.llet-=3;S.inv.formatge++;say("Has fet un formatge 🧀.")}}
+ else if(a==="cook"){if(S.inv.patata+S.inv.pastanaga<2||S.inv.llenya<1)say("Falten ingredients (2 verdures + 1 llenya).");else{for(let k=0;k<2;k++){if(S.inv.patata>0)S.inv.patata--;else S.inv.pastanaga--}S.inv.llenya--;S.inv.guisat++;say("Guisat fet! 🍲")}}
+ else if(a==="fire"){if(S.inv.llenya<1)say("No tens llenya.");else{S.inv.llenya--;S.fire[S.hi]=Math.min(9,S.fire[S.hi]+3)}}
+ else if(a==="blss"){const i=+b;if(S.faith<BC[i])say("Fervor insuficient.");else{S.faith-=BC[i];if(i===0)S.plots.forEach(p=>{if(p.st>0)p.w=3});else if(i===1)S.blessed=S.day+5;else if(i===2)S.fire=S.fire.map(()=>6);else people.forEach(p=>{if(p.alive)p.hp=Math.min(100,p.hp+30)});say("La Dama ha escoltat. "+["Cau pluja.","Els camps s’ompliran.","Les flames no s’apagaran.","Els veïns respiren millor."][i])}}
+ else if(a==="offer"){const c=b==="carbassa"?1:3;if(S.inv[b]<c)say("No en tens prou.");else{S.inv[b]-=c;S.faith=Math.min(100,S.faith+(b==="carbassa"?5:6));say("Ofrena acceptada. L’altar fumeja.")}}
+ else if(a==="ev"){evr=EV[S.pev].ch[+b][1]()||""}else if(a==="evok"){S.pev=-1;mt=null;evr=""}
+ else if(a==="tg"){if(b==="auto")S.auto=!S.auto;else if(b==="af")S.af=!S.af;else if(b==="sh")sun.castShadow=!sun.castShadow;else ctl.autoRotate=!ctl.autoRotate}
+ else if(a==="save"){save();say("Partida desada.")}else if(a==="new"){init();mt=null;say("Nova partida.")}else return;refresh()});
+addEventListener("keydown",e=>{if(e.code==="Space"&&started){sp_=sp_?0:1;refresh()}});
+function resize(){ren.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}addEventListener("resize",resize);resize();
+// Bucle
+const CT=new THREE.Vector3(0,2,1),tv=new THREE.Vector3(),SKY=[0x9ccbe8,0x7fbfe6,0xc2b49c,0xc9d6e0].map(c=>new THREE.Color(c)),NIGHT=new THREE.Color(0x060912),GR=new THREE.Color(0x8a949e),tmp=new THREE.Color(),tm2=new THREE.Color();let last=performance.now();
+try{if(localStorage.getItem("farmia2"))$("ct").style.display=""}catch(e){}
+init();ctl.autoRotate=true;
+(function loop(now){requestAnimationFrame(loop);const dt=Math.min((now-last)/1e3,.1);last=now;const g=started&&!S.over&&mt!=="ev"?dt*sp_:0;clk+=dt;fr++;
+ if(g){S.t+=g/80;if(S.t>=1){S.t-=1;endDay()}}
+ const h=S.t*24,p=h>=6&&h<=20?(h-6)/14*Math.PI:Math.PI+((h>=20?h-20:h+4)/10)*Math.PI,se=Math.sin(p),dk=Math.min(1,Math.max(0,(se+.15)/.5)),s=season(),gy=[0,.25,.6,.5][S.wx];
+ sun.position.set(Math.cos(p)*50,Math.max(se,.02)*50,22);sun.intensity=Math.max(0,se)*1.25*(1-.55*gy);sun.color.setRGB(1,.62+.38*Math.min(1,se*3),.4+.55*Math.min(1,se*3));
+ hemi.intensity=.2+.4*dk;const rmn=S.rm===S.day;tm2.copy(SKY[s]).lerp(GR,gy);tmp.copy(rmn?RNIGHT:NIGHT).lerp(tm2,dk);hemi.color.setHex(rmn&&dk<.6?0xff7070:0xcfe3ff);stars.material.color.setHex(rmn?0xff8888:0xffffff);sc.background.copy(tmp);sc.fog.color.copy(tmp);sc.fog.near=S.wx===3?35:S.wx===2?55:70;sc.fog.far=S.wx>=2?150:230;stars.material.opacity=(1-dk)*(1-gy);
+ if(lastWx!==S.wx){lastWx=S.wx;clouds.forEach(c=>c.children.forEach(m=>m.material.color.setHex([0xffffff,0xe0e4e8,0x8d939a,0xb8bec6][S.wx])))}
+ for(let i=0;i<2;i++){const on=S.fire[i]>0;wins[i].material.emissive.setHex(on?0xffb040:0);lights[i].intensity=on?(.7+.5*(1-dk))*(.9+.1*Math.sin(clk*9+i)):0;
+  smoke[i].forEach((m,k)=>{const ph=(clk/2.6+k/6)%1;m.position.set(chim[i].x+ph*1.4,chim[i].y+ph*3.2,chim[i].z);m.scale.setScalar(1+ph*2.2);m.material.opacity=on?.5*(1-ph):0})}
+ clouds.forEach(c=>{c.position.x+=c.userData.v*dt*(S.wx>=2?2:1);if(c.position.x>130)c.position.x=-130});
+ snow.visible=S.wx===3;rain.visible=S.wx===2;
+ if(snow.visible){for(let i=0;i<900;i+=3){snA[i+1]-=(2+i%5*.3)*dt;snA[i]+=Math.sin(clk+i)*dt*.6;if(snA[i+1]<-2)snA[i+1]=38}snG.attributes.position.needsUpdate=true}
+ if(rain.visible){for(let i=0;i<1500;i+=3){rnA[i+1]-=24*dt;if(rnA[i+1]<-2)rnA[i+1]=35}rnG.attributes.position.needsUpdate=true}
+ if(g)pUpdate(g,h);else if(started&&!S.over)pUpdate(0,h);
+ [[goats,S.gl,3.5,5,7,2.4],[hens,S.hl,-5.5,3.5,-8.6,1.3]].forEach(([arr,cnt,x0,wd,z0,wz])=>arr.forEach((a,i)=>{if(!cnt[i])return;const q=a.g.position;if(a.w>0){a.w-=g;return}const dx=a.tx-q.x,dz=a.tz-q.z,d=Math.hypot(dx,dz);if(d<.2){a.w=1+Math.random()*4;a.tx=x0+Math.random()*wd;a.tz=z0+Math.random()*wz}else if(g){const st=Math.min(d,.7*g);q.x+=dx/d*st;q.z+=dz/d*st;a.g.rotation.y=Math.atan2(-dz,dx)}}));
+ extras(dt,dk);if(fr%8===0)hud();ctl.update();ren.render(sc,cam)})(last);
+</script></body></html>
